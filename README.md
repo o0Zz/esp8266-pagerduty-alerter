@@ -2,6 +2,8 @@
 This project provide a PagerDuty physical alerter such as Siren, Buzzer, Light etc...
 It rely on ESP8266 NodeMCU
 
+![image](https://github.com/user-attachments/assets/aaff4a03-6967-4704-ad7e-c522b85fbfd3)
+
 # Setup
  1. Buy a NodeMCU v2 board (With CP2102 chipset) (https://www.aliexpress.com/item/1005006246641996.html)
  2. Download and install latest arduino version (https://www.arduino.cc/en/software)
