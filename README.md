@@ -1,7 +1,7 @@
 # ESP8266 PagerDuty Alerter
 This project provide a PagerDuty physical alerter such as Siren, Buzzer, Light etc...
 It rely on ESP8266 NodeMCU
-
+It can be configure via a WebInterface.
 ![image](https://github.com/user-attachments/assets/aaff4a03-6967-4704-ad7e-c522b85fbfd3)
 
 # Setup
