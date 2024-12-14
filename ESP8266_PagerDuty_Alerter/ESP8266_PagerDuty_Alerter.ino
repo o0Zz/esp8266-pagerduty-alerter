@@ -13,13 +13,14 @@ char logBuffer[LOG_COUNT][LOG_SIZE];
 unsigned int logTimestamp[LOG_COUNT];
 int currentLogIndex = 0;
 
-void Log(const String &message) {
-  strncpy(logBuffer[currentLogIndex], message.c_str(), LOG_SIZE - 1);
+void Log(const char *message) {
+  strncpy(logBuffer[currentLogIndex], message, LOG_SIZE - 1);
   logBuffer[currentLogIndex][LOG_SIZE - 1] = '\0';
   logTimestamp[currentLogIndex] = millis();
   currentLogIndex = (currentLogIndex + 1) % LOG_COUNT;
 
-  Serial.println(message);
+  Serial.write(message, strlen(message));
+  Serial.write('\n');
 }
 
 /*********************************************
@@ -103,11 +104,12 @@ public:
 
     void run() {
         if (is_triggered()) {
+            running = false;
+            
             if (callback != nullptr) {
                 callback(userData);
             }
 
-            running = false;
             if (autoRearm) {
                 restart();
             }
@@ -224,7 +226,7 @@ public:
     }
 
     void mute(unsigned long duration_s) {
-        Log("Siren: Mute for " + String(duration_s) + " seconds");
+        Log(("Siren: Mute for " + String(duration_s) + " seconds").c_str());
         digitalWrite(gpio, LOW);
         timer_mute.start(duration_s);
     }
@@ -332,7 +334,7 @@ public:
         WiFiClientSecure client;
         client.setInsecure(); // For simplicity, skip certificate verification
 
-        Log("PagerDuty: GET " + pagerduty_url);
+        Log(("PagerDuty: GET " + pagerduty_url).c_str());
         //Log("PagerDuty: Token " + pagerduty_api_key);
 
         HTTPClient https;
@@ -342,11 +344,11 @@ public:
             https.addHeader("Accept", "application/json");
 
             int httpCode = https.GET();
-            Log("PagerDuty: HTTP response code: " + String(httpCode));
+            Log(("PagerDuty: HTTP response code: " + String(httpCode)).c_str());
 
             if (httpCode/100 == 2) {
                 String payload = https.getString();
-                Log("PagerDuty: Payload: " + payload);
+                Log(("PagerDuty: Payload: " + payload).c_str());
 
                 // Check if there are open incidents
                 if (payload.indexOf("triggered") != -1) {
@@ -438,7 +440,7 @@ void loop() {
         
     SimpleTimerManager::getInstance().run(); //Run timers
     
-    if (wifi_mode = WIFI_MODE_STA)
+    if (wifi_mode == WIFI_MODE_STA)
     {
         if (WiFi.status() != WL_CONNECTED) //When Wi-Fi is disconnected, reboot
             timer_reboot.start(1);
@@ -559,7 +561,7 @@ bool startSTAMode() {
     if (wifi_ssid.length() > 0)
     {
         WiFi.begin(wifi_ssid.c_str(), wifi_pwd.c_str());
-        Log("WiFi: Connecting to " + wifi_ssid + "...");
+        Log(("WiFi: Connecting to " + wifi_ssid + "...").c_str());
 
         SimpleTimer timer_wifi_connection;
         timer_wifi_connection.start(10);
@@ -569,7 +571,7 @@ bool startSTAMode() {
         if (WiFi.status() == WL_CONNECTED) 
         {
             Log("WiFi: Successfully connected");
-            //Log("WiFi: IP Address: " + WiFi.localIP().toString()); //For unknown reason this line crash the CPU
+            Log(WiFi.localIP().toString().c_str());
             return true;
         }
         else
