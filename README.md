@@ -1,7 +1,8 @@
 # ESP8266 PagerDuty Alerter
 This project provide a PagerDuty physical alerter such as Siren, Buzzer, Light etc...
 It rely on ESP8266 NodeMCU board and can be configure via a WebInterface.
-![image](https://github.com/user-attachments/assets/aaff4a03-6967-4704-ad7e-c522b85fbfd3)
+
+<img src="https://github.com/user-attachments/assets/0077dd81-21b2-43b2-95af-ec3f0c575ee8" width="400">
 
 ## Hardware
  - NodeMCU v2 board (With CP2102 chipset) (https://www.aliexpress.com/item/1005006246641996.html)
@@ -25,24 +26,29 @@ It rely on ESP8266 NodeMCU board and can be configure via a WebInterface.
 
 ## Usage
 When the board boot it will automatically create an access point named: "PagerDuty_Alerter"
-Connect to it, Open a browser and go to: http://192.168.4.1
-Configure you WiFi and PagerDuty access
+- Connect to it, Open a browser and go to: http://192.168.4.1
+- Configure you WiFi and PagerDuty access
+
+![image](https://github.com/user-attachments/assets/aaff4a03-6967-4704-ad7e-c522b85fbfd3)
 
 A button is available to mute the siren for 5min.
 
 ### Configure API Key
-- In PagerDuty, click on your profile > "My Profile" > "User Settings" > "Create API User Token"
-Copy/Paste the key in your pagerduty alerter webinterface
+In PagerDuty, click on your profile > "My Profile" > "User Settings" > "Create API User Token" (Copy/Paste the key in your pagerduty alerter webinterface)
 
 ### Configure User ID
 User ID allow to filter alarms only on a given userID. This is usefully in case you have multiple oncall people and want to alert only for a given user.
-- In PagerDuty, click on your profile > "My Profile"
-In the URL you should found: `https://dicksondata.pagerduty.com/users/XXXXXX`, where XXXXXX is your UserID.
-Copy/Paste the user id in your pagerduty alerter webinterface
+
+In PagerDuty, click on your profile > "My Profile" - In the URL you should found: `https://dicksondata.pagerduty.com/users/XXXXXX`, where XXXXXX is your UserID. (Copy/Paste the user id in your pagerduty alerter webinterface)
 
 # Wiring 
  - D1 - Relay
  - D2 - Button
- 
+   
+
+<img src="https://github.com/user-attachments/assets/26965de2-5a68-462b-89f3-88047b3f500d" width="300">
+
+<img src="https://github.com/user-attachments/assets/716392f1-f8c0-445f-b513-6feb1eb73d3e" width="300">
+
 Then plug the Siren to the Relay.
  
