@@ -7,21 +7,36 @@
 #include <vector>
 
 /*********************************************
-          SimpleTimer Class
+         SimpleTimerManager Class
 **********************************************/
 
 class SimpleTimer;
 
 class SimpleTimerManager {
 public:
-    SimpleTimerManager();
-    void add(SimpleTimer *timer);
-    void run();
-    static SimpleTimerManager &getInstance();
+  SimpleTimerManager() 
+  {
+
+  }
+
+  void add(SimpleTimer *timer) {
+      timers.push_back(timer);
+  }
+
+  void run();
+
+  static SimpleTimerManager &getInstance() {
+      static SimpleTimerManager instance;
+      return instance;
+  }
 
 private:
     std::vector<SimpleTimer *> timers;
 };
+
+/*********************************************
+          SimpleTimer Class
+**********************************************/
 
 class SimpleTimer {
     typedef void (*Callback)(void *userData);
@@ -86,30 +101,11 @@ private:
     unsigned long lastCheckTime_ms;
 };
 
-/*********************************************
-         SimpleTimerManager Class
-**********************************************/
-
-SimpleTimerManager::SimpleTimerManager() 
-{
-
-}
-
-void SimpleTimerManager::add(SimpleTimer *timer) {
-    timers.push_back(timer);
-}
-
 void SimpleTimerManager::run() {
-    for (SimpleTimer *timer : timers) {
-        timer->run();
-    }
-}
-
-SimpleTimerManager &SimpleTimerManager::getInstance() {
-    static SimpleTimerManager instance;
-    return instance;
-}
-
+      for (SimpleTimer *timer : timers) {
+          timer->run();
+      }
+  }
 
 /*********************************************
             Config Class
@@ -117,7 +113,15 @@ SimpleTimerManager &SimpleTimerManager::getInstance() {
 
 class Config {
 public:
-    Config(const String &filename) : filename(filename) {}
+    Config(const String &filename): 
+      filename(filename) 
+    {
+        if (SPIFFS.begin()) {
+            Serial.println("SPIFFS mounted successfully");
+        } else {
+            Serial.println("Failed to mount SPIFFS");
+        }
+    }
 
     bool load() {
         if (SPIFFS.exists(filename)) {
@@ -272,6 +276,77 @@ private:
 };
 
 /*********************************************
+                PagerDuty class
+**********************************************/
+
+#define PAGERDUTY_URL "https://api.pagerduty.com/incidents?statuses[]=triggered"
+#define PAGERDUTY_QUERY_URL_USER "&user_ids[]="
+
+class PagerDuty
+{
+public:
+    PagerDuty() {}
+
+    void setup(String pagerduty_api_key, String pagerduty_user_id) {
+        this->pagerduty_api_key = pagerduty_api_key;
+        this->pagerduty_user_id = pagerduty_user_id;
+    }
+
+    int getIncidentCount() {
+        if (pagerduty_api_key.length() == 0)
+        {
+            Serial.println("PagerDuty API Key not configured");
+            return lastIncidentCount;
+        }
+
+        String pagerduty_url = PAGERDUTY_URL;
+        if (pagerduty_user_id.length() > 0)
+            pagerduty_url += String(PAGERDUTY_QUERY_URL_USER) + pagerduty_user_id;
+
+        WiFiClientSecure client;
+        client.setInsecure(); // For simplicity, skip certificate verification
+
+        Serial.println("GET " + pagerduty_url);
+        //Serial.println("Token: " + pagerduty_api_key);
+
+        HTTPClient https;
+        if (https.begin(client, pagerduty_url)) {
+            https.addHeader("Authorization", String("Token token=") + pagerduty_api_key);
+            https.addHeader("Content-Type", "application/json");
+            https.addHeader("Accept", "application/json");
+
+            int httpCode = https.GET();
+            Serial.print("HTTP response code: ");
+            Serial.println(httpCode);
+
+            if (httpCode/100 == 2) {
+                String payload = https.getString();
+                Serial.print("PagerDuty API Payload:");
+                Serial.println(payload);
+
+                // Check if there are open incidents
+                if (payload.indexOf("triggered") != -1) {
+                    lastIncidentCount = 1;
+                } else {
+                    lastIncidentCount = 0;
+                }
+            }
+            https.end();
+
+        } else {
+            Serial.println("Unable to connect to PagerDuty API");
+        }
+
+        return lastIncidentCount;
+    }
+
+private:
+    String pagerduty_user_id;
+    String pagerduty_api_key;
+    int lastIncidentCount = 0;
+};
+
+/*********************************************
                 Application
 **********************************************/
 
@@ -292,12 +367,12 @@ typedef enum WifiMode
 #define WIFI_AP_SSID                        "PagerDuty_Alerter"
 #define WIFI_AP_PWD                         ""
 
-#define PAGERDUTY_URL "https://api.pagerduty.com/incidents?statuses[]=triggered"
-#define PAGERDUTY_QUERY_URL_USER "&user_ids[]="
 #define PAGERDUTY_DEFAULT_INTERVAL_S 60
 
+bool startSTAMode();
+bool startAPMode();
 void startHttpServer();
-void startApMode();
+
 void checkPagerDuty(void *);
 void reboot(void *);
 
@@ -310,52 +385,24 @@ ESP8266WebServer    server(80);
 Config              config("/config.ini");
 Siren               siren(GPIO_SIREN); 
 Button              button(GPIO_BUTTON);
+PagerDuty           pagerduty;
 
 void setup() {
     Serial.begin(115200);
-
-    if (SPIFFS.begin()) {
-        Serial.println("SPIFFS mounted successfully");
-    } else {
-        Serial.println("Failed to mount SPIFFS");
-    }
+    Serial.println("");
 
     config.load();
 
-    String wifi_ssid = config.getStr("wifi_ssid");
-    String wifi_pwd = config.getStr("wifi_pwd");
-    if (wifi_ssid.length() > 0)
+    pagerduty.setup(config.getStr("pagerduty_api_key"), config.getStr("pagerduty_user_id"));
+
+    if (startSTAMode()) //Connect to WiFi
     {
-        wifi_mode = WIFI_MODE_STA;
-        WiFi.begin(wifi_ssid.c_str(), wifi_pwd.c_str());
-        Serial.println("Connecting to Wi-Fi " + wifi_ssid + "...");
-
-        SimpleTimer timer_wifi_connection;
-        timer_wifi_connection.start(10);
-        while (WiFi.status() != WL_CONNECTED && timer_wifi_connection.is_running()) 
-        {
-            delay(500);
-            Serial.print(".");
-        }
-        
-        if (WiFi.status() == WL_CONNECTED) 
-        {
-            Serial.println("Successfully connected to Wi-Fi");
-            Serial.print("IP Address: ");
-            Serial.println(WiFi.localIP());
-
-            timer_pager_duty_check.start(config.getInt("pagerduty_interval_s", PAGERDUTY_DEFAULT_INTERVAL_S));
-        }
-        else
-        {
-            Serial.println("Failed to connect to Wi-Fi: " + wifi_ssid);
-            startApMode();
-        }
+        timer_pager_duty_check.start(config.getInt("pagerduty_interval_s", PAGERDUTY_DEFAULT_INTERVAL_S));
     }
-    else
+    else //No WiFi available, start AP mode to configure the module
     {
-        Serial.println("No Wi-Fi configuration found");
-        startApMode();
+        startAPMode();
+        timer_reboot.start(TIMER_REBOOT_WIFI_AP); 
     }
 
     startHttpServer();
@@ -464,11 +511,52 @@ void startHttpServer() {
     Serial.println("HTTP server started");
 }
 
-void startApMode() {
+bool startSTAMode() {
+    wifi_mode = WIFI_MODE_STA;
+
+    String wifi_ssid = config.getStr("wifi_ssid");
+    String wifi_pwd = config.getStr("wifi_pwd");
+
+    if (wifi_ssid.length() > 0)
+    {
+        WiFi.begin(wifi_ssid.c_str(), wifi_pwd.c_str());
+        Serial.println("Connecting to Wi-Fi " + wifi_ssid + "...");
+
+        SimpleTimer timer_wifi_connection;
+        timer_wifi_connection.start(10);
+        while (WiFi.status() != WL_CONNECTED && timer_wifi_connection.is_running()) 
+        {
+            delay(500);
+            Serial.print(".");
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) 
+        {
+            Serial.println("Successfully connected to Wi-Fi");
+            Serial.print("IP Address: ");
+            Serial.println(WiFi.localIP());
+            return true;
+        }
+        else
+        {
+            Serial.println("Failed to connect to Wi-Fi: " + wifi_ssid);
+        }
+    }
+    else
+    {
+        Serial.println("No Wi-Fi configuration found");
+    }
+
+    return false;
+}
+
+bool startAPMode() {
     wifi_mode = WIFI_MODE_AP;
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PWD);
+
     Serial.println("AP Mode started. Connect to '" WIFI_AP_SSID "' and access 'http://192.168.4.1'");
-    timer_reboot.start(TIMER_REBOOT_WIFI_AP); 
+    
+    return true;
 }
 
 void reboot(void *) {
@@ -477,54 +565,9 @@ void reboot(void *) {
 }
 
 void checkPagerDuty(void *) {
-    Serial.println("Checking PagerDuty for active incident ...");
-    
-    String pagerduty_user_id = config.getStr("pagerduty_user_id");
-    String pagerduty_api_key = config.getStr("pagerduty_api_key");
-
-    if (pagerduty_api_key.length() == 0)
-    {
-        Serial.println("PagerDuty API Key not configured");
-        return;
-    }
-
-    String pagerduty_url = PAGERDUTY_URL;
-    if (pagerduty_user_id.length() > 0)
-        pagerduty_url += String(PAGERDUTY_QUERY_URL_USER) + pagerduty_user_id;
-
-    WiFiClientSecure client;
-    client.setInsecure(); // For simplicity, skip certificate verification
-
-    Serial.println("GET " + pagerduty_url);
-    //Serial.println("Token: " + pagerduty_api_key);
-
-    HTTPClient https;
-    if (https.begin(client, pagerduty_url)) {
-        https.addHeader("Authorization", String("Token token=") + pagerduty_api_key);
-        https.addHeader("Content-Type", "application/json");
-        https.addHeader("Accept", "application/json");
-
-        int httpCode = https.GET();
-        Serial.print("HTTP response code: ");
-        Serial.println(httpCode);
-
-        if (httpCode/100 == 2) {
-            String payload = https.getString();
-            Serial.print("PagerDuty API Payload:");
-            Serial.println(payload);
-
-            // Check if there are open incidents
-            if (payload.indexOf("triggered") != -1) {
-                Serial.println("Open incident detected!");
-                siren.on();
-            } else {
-                Serial.println("No open incidents.");
-                siren.off();
-            }
-        }
-        https.end();
-
-    } else {
-        Serial.println("Unable to connect to PagerDuty API");
-    }
+    Serial.println("Checking PagerDuty...");
+    if (pagerduty.getIncidentCount() > 0)
+        siren.on();
+    else
+        siren.off();
 }
