@@ -6,6 +6,22 @@
 #include <map>
 #include <vector>
 
+#define LOG_COUNT 8
+#define LOG_SIZE  80
+
+char logBuffer[LOG_COUNT][LOG_SIZE];
+unsigned int logTimestamp[LOG_COUNT];
+int currentLogIndex = 0;
+
+void Log(const String &message) {
+  strncpy(logBuffer[currentLogIndex], message.c_str(), LOG_SIZE - 1);
+  logBuffer[currentLogIndex][LOG_SIZE - 1] = '\0';
+  logTimestamp[currentLogIndex] = millis();
+  currentLogIndex = (currentLogIndex + 1) % LOG_COUNT;
+
+  Serial.println(message);
+}
+
 /*********************************************
          SimpleTimerManager Class
 **********************************************/
@@ -42,8 +58,14 @@ class SimpleTimer {
     typedef void (*Callback)(void *userData);
 
 public:
-    SimpleTimer(Callback callback = nullptr, void *userData = nullptr, bool autoRearm = false)
-        : callback(callback), userData(userData), autoRearm(autoRearm), running(false), interval_s(0), lastCheckTime_ms(0) {
+    SimpleTimer(Callback callback = nullptr, void *userData = nullptr, bool autoRearm = false) : 
+        callback(callback), 
+        userData(userData), 
+        autoRearm(autoRearm), 
+        running(false), 
+        interval_s(0), 
+        lastCheckTime_ms(0)
+    {
         SimpleTimerManager::getInstance().add(this);
     }
 
@@ -52,7 +74,7 @@ public:
     }
 
     void start(unsigned long interval_s) {
-        //Serial.println("Timer started: " + String(interval_s));
+        //Log("Timer: started: " + String(interval_s));
         this->interval_s = interval_s;
         restart();
     }
@@ -117,9 +139,9 @@ public:
       filename(filename) 
     {
         if (SPIFFS.begin()) {
-            Serial.println("SPIFFS mounted successfully");
+            Log("SPIFFS: Mounted successfully");
         } else {
-            Serial.println("Failed to mount SPIFFS");
+            Log("SPIFFS: Failed to mount");
         }
     }
 
@@ -180,7 +202,11 @@ private:
 
 class Siren {
 public:
-    Siren(int gpio) : gpio(gpio), is_on(false), timer_mute(unmuteCallback, this, false) {
+    Siren(int gpio) : 
+        gpio(gpio), 
+        is_on(false), 
+        timer_mute(Siren::unmuteCallback, this, false) 
+    {
         pinMode(gpio, OUTPUT);
         digitalWrite(gpio, LOW);
     }
@@ -198,13 +224,13 @@ public:
     }
 
     void mute(unsigned long duration_s) {
-        Serial.println("Siren: Mute for " + String(duration_s));
+        Log("Siren: Mute for " + String(duration_s) + " seconds");
         digitalWrite(gpio, LOW);
         timer_mute.start(duration_s);
     }
 
     void unmute() {
-        Serial.println("Siren: Unmute");
+        Log("Siren: Unmute");
         if (is_on) {
             digitalWrite(gpio, HIGH);
         }
@@ -287,7 +313,7 @@ class PagerDuty
 public:
     PagerDuty() {}
 
-    void setup(String pagerduty_api_key, String pagerduty_user_id) {
+    void setup(const String &pagerduty_api_key, const String &pagerduty_user_id) {
         this->pagerduty_api_key = pagerduty_api_key;
         this->pagerduty_user_id = pagerduty_user_id;
     }
@@ -295,7 +321,7 @@ public:
     int getIncidentCount() {
         if (pagerduty_api_key.length() == 0)
         {
-            Serial.println("PagerDuty API Key not configured");
+            Log("PagerDuty: API Key not configured");
             return lastIncidentCount;
         }
 
@@ -306,8 +332,8 @@ public:
         WiFiClientSecure client;
         client.setInsecure(); // For simplicity, skip certificate verification
 
-        Serial.println("GET " + pagerduty_url);
-        //Serial.println("Token: " + pagerduty_api_key);
+        Log("PagerDuty: GET " + pagerduty_url);
+        //Log("PagerDuty: Token " + pagerduty_api_key);
 
         HTTPClient https;
         if (https.begin(client, pagerduty_url)) {
@@ -316,13 +342,11 @@ public:
             https.addHeader("Accept", "application/json");
 
             int httpCode = https.GET();
-            Serial.print("HTTP response code: ");
-            Serial.println(httpCode);
+            Log("PagerDuty: HTTP response code: " + String(httpCode));
 
             if (httpCode/100 == 2) {
                 String payload = https.getString();
-                Serial.print("PagerDuty API Payload:");
-                Serial.println(payload);
+                Log("PagerDuty: Payload: " + payload);
 
                 // Check if there are open incidents
                 if (payload.indexOf("triggered") != -1) {
@@ -334,7 +358,7 @@ public:
             https.end();
 
         } else {
-            Serial.println("Unable to connect to PagerDuty API");
+            Log("PagerDuty: Unable to connect to API");
         }
 
         return lastIncidentCount;
@@ -424,38 +448,44 @@ void loop() {
     {
         if (button.isPressed())
         {
-            Serial.println("Button Pressed, mute siren for " + String(TIMER_MUTE) + "s");
+            Log("Button: Pressed");
             siren.mute(TIMER_MUTE);
         }
     }
 }
 
-void sendHTML(String title, String HTMLContent)
+#define HTML_HEADER "<html><head>\
+  <style>\
+    body {font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;}\
+    .container {text-align: center; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}\
+    h2 {margin-bottom: 20px;}\
+    a, input[type='submit'] {padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: 0.3s;}\
+    a {text-decoration: none; color: #fff; background: #007bff; margin: 10px 0; display: inline-block;}\
+    a:hover {background: #0056b3;}\
+    input[type='text'], input[type='password'] {padding: 10px; margin: 10px 0; width: calc(100% - 22px); border: 1px solid #ccc; border-radius: 5px;}\
+    input[type='submit'] {background: #28a745; color: #fff; border: none;}\
+    input[type='submit']:hover {background: #218838;}\
+  </style>\
+  </head>\
+  <body>"
+
+#define HTML_FOOTER "</body></html>"
+
+void sendHTML(const String &title, const String &HTMLContent)
 {
-  String html = "<html><head>";
-  html += "<style>";
-  html += "  body {font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;}";
-  html += "  .container {text-align: center; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}";
-  html += "  h2 {margin-bottom: 20px;}";
-  html += "  a, input[type='submit'] {padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: 0.3s;}";
-  html += "  a {text-decoration: none; color: #fff; background: #007bff; margin: 10px 0; display: inline-block;}";
-  html += "  a:hover {background: #0056b3;}";
-  html += "  input[type='text'], input[type='password'] {padding: 10px; margin: 10px 0; width: calc(100% - 22px); border: 1px solid #ccc; border-radius: 5px;}";
-  html += "  input[type='submit'] {background: #28a745; color: #fff; border: none;}";
-  html += "  input[type='submit']:hover {background: #218838;}";
-  html += "</style>";
-  html += "</head>";
-  html += "<body>";
-  html += "<div class='container'>";
-  html += "<h2>" + title + "</h2>";
-  html += HTMLContent;
-  html += "</div></body></html>";
-  server.send(200, "text/html", html);
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN); // Enable chunked transfer
+  server.send(200, "text/html", ""); // Send the initial headers
+  server.sendContent(HTML_HEADER);
+  server.sendContent("<div class='container'><h2>" + title + "</h2>");
+  server.sendContent(HTMLContent);
+  server.sendContent("</div>");
+  server.sendContent(HTML_FOOTER);
+  server.sendContent("");
 }
 
 void startHttpServer() {
     server.on("/", HTTP_GET, []() {
-        sendHTML("PagerDuty Alerter", "<a href='/wifi_configure'>Configure Wi-Fi</a><br><a href='/pagerduty_configure'>Configure PagerDuty</a>");
+        sendHTML("PagerDuty Alerter", "<a href='/wifi_configure'>Configure Wi-Fi</a><br><a href='/pagerduty_configure'>Configure PagerDuty</a><br><a href='/logs'>Logs</a>");
     });
 
     server.on("/wifi_configure", HTTP_GET, []() {
@@ -489,6 +519,15 @@ void startHttpServer() {
         sendHTML("PagerDuty Configuration", html);
     });
 
+    server.on("/logs", HTTP_GET, []() {
+        String html;
+        html += "<table border='1'><tr><th>Timestamp (ms)</th><th>Message</th></tr>";
+        for (int i = 0; i < LOG_COUNT; i++)
+          html += "<tr><td>" + String(logTimestamp[(currentLogIndex + i) % LOG_COUNT]) + "</td><td>" + String(logBuffer[(currentLogIndex + i) % LOG_COUNT]) + "</td></tr>";
+        html += "</table>";
+        sendHTML("Logs", html);
+    });
+
     server.on("/pagerduty_save", HTTP_POST, []() {
         if (server.hasArg("api_key") && server.arg("api_key").length() > 0)
             config.set("pagerduty_api_key", server.arg("api_key"));
@@ -508,7 +547,7 @@ void startHttpServer() {
     });
 
     server.begin();
-    Serial.println("HTTP server started");
+    Log("HTTPserver: Started");
 }
 
 bool startSTAMode() {
@@ -520,31 +559,27 @@ bool startSTAMode() {
     if (wifi_ssid.length() > 0)
     {
         WiFi.begin(wifi_ssid.c_str(), wifi_pwd.c_str());
-        Serial.println("Connecting to Wi-Fi " + wifi_ssid + "...");
+        Log("WiFi: Connecting to " + wifi_ssid + "...");
 
         SimpleTimer timer_wifi_connection;
         timer_wifi_connection.start(10);
         while (WiFi.status() != WL_CONNECTED && timer_wifi_connection.is_running()) 
-        {
             delay(500);
-            Serial.print(".");
-        }
         
         if (WiFi.status() == WL_CONNECTED) 
         {
-            Serial.println("Successfully connected to Wi-Fi");
-            Serial.print("IP Address: ");
-            Serial.println(WiFi.localIP());
+            Log("WiFi: Successfully connected");
+            //Log("WiFi: IP Address: " + WiFi.localIP().toString()); //For unknown reason this line crash the CPU
             return true;
         }
         else
         {
-            Serial.println("Failed to connect to Wi-Fi: " + wifi_ssid);
+            Log("WiFi: Failed to connect");
         }
     }
     else
     {
-        Serial.println("No Wi-Fi configuration found");
+        Log("WiFi: No configuration found");
     }
 
     return false;
@@ -554,18 +589,17 @@ bool startAPMode() {
     wifi_mode = WIFI_MODE_AP;
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PWD);
 
-    Serial.println("AP Mode started. Connect to '" WIFI_AP_SSID "' and access 'http://192.168.4.1'");
+    Log("WiFi: AP Mode started. Connect to '" WIFI_AP_SSID "' and access 'http://192.168.4.1'");
     
     return true;
 }
 
 void reboot(void *) {
-    Serial.println("Rebooting...");
+    Log("Rebooting...");
     ESP.restart();
 }
 
 void checkPagerDuty(void *) {
-    Serial.println("Checking PagerDuty...");
     if (pagerduty.getIncidentCount() > 0)
         siren.on();
     else
