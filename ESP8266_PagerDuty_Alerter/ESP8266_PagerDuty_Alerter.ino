@@ -40,6 +40,10 @@ public:
       timers.push_back(timer);
   }
 
+  void remove(SimpleTimer *timer) {
+      timers.erase(std::remove(timers.begin(), timers.end(), timer), timers.end());
+  }
+
   void run();
 
   static SimpleTimerManager &getInstance() {
@@ -72,6 +76,7 @@ public:
 
     ~SimpleTimer() {
         stop();
+        SimpleTimerManager::getInstance().remove(this);
     }
 
     void start(unsigned long interval_s) {
@@ -348,7 +353,7 @@ public:
 
             if (httpCode/100 == 2) {
                 String payload = https.getString();
-                Log(("PagerDuty: Payload: " + payload).c_str());
+                //Log(("PagerDuty: Payload: " + payload).c_str());
 
                 // Check if there are open incidents
                 if (payload.indexOf("triggered") != -1) {
@@ -591,7 +596,7 @@ bool startAPMode() {
     wifi_mode = WIFI_MODE_AP;
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PWD);
 
-    Log("WiFi: AP Mode started. Connect to '" WIFI_AP_SSID "' and access 'http://192.168.4.1'");
+    Log("WiFi: AP Mode started. Name: '" WIFI_AP_SSID "' (http://192.168.4.1)");
     
     return true;
 }
