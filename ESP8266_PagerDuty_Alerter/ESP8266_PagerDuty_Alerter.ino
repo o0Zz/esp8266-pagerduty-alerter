@@ -13,13 +13,13 @@ char logBuffer[LOG_COUNT][LOG_SIZE];
 unsigned int logTimestamp[LOG_COUNT];
 int currentLogIndex = 0;
 
-void Log(const char *message) {
-  strncpy(logBuffer[currentLogIndex], message, LOG_SIZE - 1);
+void Log(const String &message) {
+  strncpy(logBuffer[currentLogIndex], message.c_str(), LOG_SIZE - 1);
   logBuffer[currentLogIndex][LOG_SIZE - 1] = '\0';
   logTimestamp[currentLogIndex] = millis();
   currentLogIndex = (currentLogIndex + 1) % LOG_COUNT;
 
-  Serial.write(message, strlen(message));
+  Serial.write(message.c_str(), message.length());
   Serial.write('\n');
 }
 
@@ -146,9 +146,9 @@ public:
       filename(filename) 
     {
         if (SPIFFS.begin()) {
-            Log("SPIFFS: Mounted successfully");
+            Log(F("SPIFFS: Mounted successfully"));
         } else {
-            Log("SPIFFS: Failed to mount");
+            Log(F("SPIFFS: Failed to mount"));
         }
     }
 
@@ -231,13 +231,13 @@ public:
     }
 
     void mute(unsigned long duration_s) {
-        Log(("Siren: Mute for " + String(duration_s) + " seconds").c_str());
+        Log("Siren: Mute for " + String(duration_s) + " seconds");
         digitalWrite(gpio, LOW);
         timer_mute.start(duration_s);
     }
 
     void unmute() {
-        Log("Siren: Unmute");
+        Log(F("Siren: Unmute"));
         if (is_on) {
             digitalWrite(gpio, HIGH);
         }
@@ -328,7 +328,7 @@ public:
     int getIncidentCount() {
         if (pagerduty_api_key.length() == 0)
         {
-            Log("PagerDuty: API Key not configured");
+            Log(F("PagerDuty: API Key not configured"));
             return lastIncidentCount;
         }
 
@@ -339,7 +339,7 @@ public:
         WiFiClientSecure client;
         client.setInsecure(); // For simplicity, skip certificate verification
 
-        Log(("PagerDuty: GET " + pagerduty_url).c_str());
+        Log("PagerDuty: GET " + pagerduty_url);
         //Log("PagerDuty: Token " + pagerduty_api_key);
 
         HTTPClient https;
@@ -349,11 +349,11 @@ public:
             https.addHeader("Accept", "application/json");
 
             int httpCode = https.GET();
-            Log(("PagerDuty: HTTP response code: " + String(httpCode)).c_str());
+            Log("PagerDuty: HTTP response code: " + String(httpCode));
 
             if (httpCode/100 == 2) {
                 String payload = https.getString();
-                //Log(("PagerDuty: Payload: " + payload).c_str());
+                Log("PagerDuty: Payload: " + payload);
 
                 // Check if there are open incidents
                 if (payload.indexOf("triggered") != -1) {
@@ -365,7 +365,7 @@ public:
             https.end();
 
         } else {
-            Log("PagerDuty: Unable to connect to API");
+            Log(F("PagerDuty: Unable to connect to API"));
         }
 
         return lastIncidentCount;
@@ -455,7 +455,7 @@ void loop() {
     {
         if (button.isPressed())
         {
-            Log("Button: Pressed");
+            Log(F("Button: Pressed"));
             siren.mute(TIMER_MUTE);
         }
     }
@@ -554,7 +554,7 @@ void startHttpServer() {
     });
 
     server.begin();
-    Log("HTTPserver: Started");
+    Log(F("HTTPserver: Started"));
 }
 
 bool startSTAMode() {
@@ -566,7 +566,7 @@ bool startSTAMode() {
     if (wifi_ssid.length() > 0)
     {
         WiFi.begin(wifi_ssid.c_str(), wifi_pwd.c_str());
-        Log(("WiFi: Connecting to " + wifi_ssid + "...").c_str());
+        Log("WiFi: Connecting to " + wifi_ssid + "...");
 
         SimpleTimer timer_wifi_connection;
         timer_wifi_connection.start(10);
@@ -575,18 +575,18 @@ bool startSTAMode() {
         
         if (WiFi.status() == WL_CONNECTED) 
         {
-            Log("WiFi: Successfully connected");
+            Log(F("WiFi: Successfully connected"));
             Log(WiFi.localIP().toString().c_str());
             return true;
         }
         else
         {
-            Log("WiFi: Failed to connect");
+            Log(F("WiFi: Failed to connect"));
         }
     }
     else
     {
-        Log("WiFi: No configuration found");
+        Log(F("WiFi: No configuration found"));
     }
 
     return false;
@@ -596,13 +596,13 @@ bool startAPMode() {
     wifi_mode = WIFI_MODE_AP;
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PWD);
 
-    Log("WiFi: AP Mode started. Name: '" WIFI_AP_SSID "' (http://192.168.4.1)");
+    Log(F("WiFi: AP Mode started. Name: '" WIFI_AP_SSID "' (http://192.168.4.1)"));
     
     return true;
 }
 
 void reboot(void *) {
-    Log("Rebooting...");
+    Log(F("Rebooting..."));
     ESP.restart();
 }
 
