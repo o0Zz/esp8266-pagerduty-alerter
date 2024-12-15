@@ -8,6 +8,7 @@ It rely on ESP8266 NodeMCU board and can be configure via a WebInterface.
  - Poll PagerDuty API and look for any open incident every 60s (Can be configured)
  - A UserID filter is available to look for open incident asign to this user
  - A hardware button can be added to mute the siren for 5min.
+ - An access point is automatically started for 5 min when not connected to a WiFi
 
 ## Hardware
  - NodeMCU v2 board (With CP2102 chipset) (https://www.aliexpress.com/item/1005006246641996.html)

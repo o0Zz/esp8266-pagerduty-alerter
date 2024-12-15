@@ -168,9 +168,11 @@ public:
                     }
                 }
                 file.close();
+                Log(F("Config: Loaded successfully"));
                 return true;
             }
         }
+        Log(F("Config: Load failed (Not found)"));
         return false;
     }
 
@@ -181,8 +183,10 @@ public:
                 file.println(entry.first + "=" + entry.second);
             }
             file.close();
+            Log(F("Config: Saved successfully"));
             return true;
         }
+        Log(F("Config: Save failed"));
         return false;
     }
 
@@ -448,9 +452,12 @@ void loop() {
     if (wifi_mode == WIFI_MODE_STA)
     {
         if (WiFi.status() != WL_CONNECTED) //When Wi-Fi is disconnected, reboot
+        {
+            Log(F("WiFi: Disconnected !"));
             timer_reboot.start(1);
+        }
     }
-        
+
     if (button.stateChanged())
     {
         if (button.isPressed())
