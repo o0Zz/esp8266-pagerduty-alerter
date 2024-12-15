@@ -454,7 +454,7 @@ void loop() {
         if (WiFi.status() != WL_CONNECTED) //When Wi-Fi is disconnected, reboot
         {
             Log(F("WiFi: Disconnected !"));
-            timer_reboot.start(1);
+            reboot(NULL);
         }
     }
 
@@ -582,8 +582,7 @@ bool startSTAMode() {
         
         if (WiFi.status() == WL_CONNECTED) 
         {
-            Log(F("WiFi: Successfully connected"));
-            Log(WiFi.localIP().toString().c_str());
+            Log("WiFi: Successfully connected, IP Address: " + WiFi.localIP().toString());
             return true;
         }
         else
