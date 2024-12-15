@@ -577,7 +577,7 @@ bool startSTAMode() {
 
         SimpleTimer timer_wifi_connection;
         timer_wifi_connection.start(10);
-        while (WiFi.status() != WL_CONNECTED && timer_wifi_connection.is_running()) 
+        while (WiFi.status() != WL_CONNECTED && !timer_wifi_connection.is_triggered()) 
             delay(500);
         
         if (WiFi.status() == WL_CONNECTED) 
