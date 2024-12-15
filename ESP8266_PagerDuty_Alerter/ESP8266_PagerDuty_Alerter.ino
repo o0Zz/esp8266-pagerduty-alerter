@@ -471,14 +471,16 @@ void loop() {
 #define HTML_HEADER "<html><head>\
   <style>\
     body {font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;}\
-    .container {text-align: center; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}\
+    .container {text-align: center; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px;}\
     h2 {margin-bottom: 20px;}\
-    a, input[type='submit'] {padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: 0.3s;}\
-    a {text-decoration: none; color: #fff; background: #007bff; margin: 10px 0; display: inline-block;}\
-    a:hover {background: #0056b3;}\
-    input[type='text'], input[type='password'] {padding: 10px; margin: 10px 0; width: calc(100% - 22px); border: 1px solid #ccc; border-radius: 5px;}\
-    input[type='submit'] {background: #28a745; color: #fff; border: none;}\
-    input[type='submit']:hover {background: #218838;}\
+    input, .button {padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; transition: 0.3s; text-align: center; display: inline-block; border: none; text-decoration: none;}\
+    input[type='text'], input[type='password'] {margin: 10px 0; width: calc(100% - 22px); border: 1px solid #ccc;}\
+    .button {color: #fff;}\
+    a.button {background: #007bff;} a.button:hover {background: #0056b3;}\
+    .back-button {background: #6c757d;} .back-button:hover {background: #5a6268;}\
+    .menu-button {width: 300px; margin: 10px;}\
+    .save-button {background: #28a745;} .save-button:hover {background: #218838;}\
+    .form-actions {display: flex; justify-content: center; gap: 10px; margin-top: 20px;}\
   </style>\
   </head>\
   <body>"
@@ -499,14 +501,14 @@ void sendHTML(const String &title, const String &HTMLContent)
 
 void startHttpServer() {
     server.on("/", HTTP_GET, []() {
-        sendHTML("PagerDuty Alerter", "<a href='/wifi_configure'>Configure Wi-Fi</a><br><a href='/pagerduty_configure'>Configure PagerDuty</a><br><a href='/logs'>Logs</a>");
+        sendHTML("PagerDuty Alerter", "<a href='/wifi_configure' class='button menu-button'>Configure Wi-Fi</a><br><a href='/pagerduty_configure' class='button menu-button'>Configure PagerDuty</a><br><a href='/logs' class='button menu-button'>Logs</a>");
     });
 
     server.on("/wifi_configure", HTTP_GET, []() {
         String html = "<form method='POST' action='/wifi_save'>";
         html += "SSID: <input type='text' name='ssid' value='" + config.getStr("wifi_ssid") + "'><br>";
         html += "Password: <input type='password' name='pwd'><br>";
-        html += "<input type='submit' value='Save'></form>";
+        html += "<a href='/' class='button back-button'>Back</a> <input type='submit' value='Save' class='button save-button'></form>";
         sendHTML("Wi-Fi Configuration", html);
     });
 
@@ -529,17 +531,8 @@ void startHttpServer() {
         html += "API Key (Empty = Keep unchanged): <input type='text' name='api_key' value=''><br>";
         html += "User ID (Empty = All users): <input type='text' name='user_id' value='" + config.getStr("pagerduty_user_id") + "'><br>";
         html += "Interval (Seconds): <input type='text' name='interval_s' value='" + config.getStr("pagerduty_interval_s", String(PAGERDUTY_DEFAULT_INTERVAL_S)) + "'><br>";
-        html += "<input type='submit' value='Save'></form>";
+        html += "<a href='/' class='button back-button'>Back</a> <input type='submit' value='Save' class='button save-button'></form>";
         sendHTML("PagerDuty Configuration", html);
-    });
-
-    server.on("/logs", HTTP_GET, []() {
-        String html;
-        html += "<table border='1'><tr><th>Timestamp (ms)</th><th>Message</th></tr>";
-        for (int i = 0; i < LOG_COUNT; i++)
-          html += "<tr><td>" + String(logTimestamp[(currentLogIndex + i) % LOG_COUNT]) + "</td><td>" + String(logBuffer[(currentLogIndex + i) % LOG_COUNT]) + "</td></tr>";
-        html += "</table>";
-        sendHTML("Logs", html);
     });
 
     server.on("/pagerduty_save", HTTP_POST, []() {
@@ -558,6 +551,16 @@ void startHttpServer() {
         config.save();
         sendHTML("Configuration Saved", "<meta http-equiv='refresh' content='3; url=/'><p>Rebooting...</p>");
         timer_reboot.start(TIMER_REBOOT_APPLY_SETTINGS);
+    });
+
+    server.on("/logs", HTTP_GET, []() {
+        String html;
+        html += "<table border='1'><tr><th>Timestamp (ms)</th><th>Message</th></tr>";
+        for (int i = 0; i < LOG_COUNT; i++)
+          html += "<tr><td>" + String(logTimestamp[(currentLogIndex + i) % LOG_COUNT]) + "</td><td>" + String(logBuffer[(currentLogIndex + i) % LOG_COUNT]) + "</td></tr>";
+        html += "</table><br>";
+        html += "<a href='/' class='button back-button'>Back</a>";
+        sendHTML("Logs", html);
     });
 
     server.begin();
