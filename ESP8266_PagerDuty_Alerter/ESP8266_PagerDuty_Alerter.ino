@@ -6,8 +6,33 @@
 #include <map>
 #include <vector>
 
+/*********************************************
+                    Configuration
+**********************************************/
+
+#define PAGERDUTY_FAKE_INCIDENT 0
+
+#define GPIO_SIREN            5 //D1
+#define GPIO_SIREN_REVERSED   true
+
+#define GPIO_BUTTON         4 //D2
+
+#define TIMER_MUTE                          60*5 // 5min
+#define TIMER_REBOOT_WIFI_AP                60*5 // 5min
+#define TIMER_REBOOT_APPLY_SETTINGS         1 // 1s
+
+#define WIFI_AP_SSID                        "PagerDuty_Alerter"
+#define WIFI_AP_PWD                         ""
+
+#define PAGERDUTY_DEFAULT_INTERVAL_S 60
+
 #define LOG_COUNT 8
 #define LOG_SIZE  80
+
+
+/*********************************************
+                    Logs
+**********************************************/
 
 char logBuffer[LOG_COUNT][LOG_SIZE];
 unsigned int logTimestamp[LOG_COUNT];
@@ -213,25 +238,26 @@ private:
 
 class Siren {
 public:
-    Siren(int gpio) : 
+    Siren(int gpio, bool gpio_reversed) : 
         gpio(gpio), 
+        gpio_reversed(gpio_reversed),
         is_on(false), 
         timer_mute(Siren::unmuteCallback, this, false) 
     {
         pinMode(gpio, OUTPUT);
-        digitalWrite(gpio, LOW);
+        off();
     }
 
     void on() {
         is_on = true;
         if (!timer_mute.is_running()) {
-            digitalWrite(gpio, HIGH);
+            digitalWrite(gpio, gpio_reversed ? LOW : HIGH);
         }
     }
 
     void off() {
         is_on = false;
-        digitalWrite(gpio, LOW);
+        digitalWrite(gpio, gpio_reversed ? HIGH : LOW);
     }
 
     void mute(unsigned long duration_s) {
@@ -243,7 +269,7 @@ public:
     void unmute() {
         Log(F("Siren: Unmute"));
         if (is_on) {
-            digitalWrite(gpio, HIGH);
+            digitalWrite(gpio, gpio_reversed ? LOW : HIGH);
         }
     }
 
@@ -254,6 +280,7 @@ private:
     }
 
     int gpio;
+    bool gpio_reversed;
     bool is_on;
     SimpleTimer timer_mute;
 };
@@ -363,7 +390,7 @@ public:
                 if (payload.indexOf("triggered") != -1) {
                     lastIncidentCount = 1;
                 } else {
-                    lastIncidentCount = 0;
+                    lastIncidentCount = PAGERDUTY_FAKE_INCIDENT;
                 }
             }
             https.end();
@@ -392,18 +419,6 @@ typedef enum WifiMode
     WIFI_MODE_AP
 } WifiMode;
 
-#define GPIO_SIREN          5 //D1
-#define GPIO_BUTTON         4 //D2
-
-#define TIMER_MUTE                          60*5 // 5min
-#define TIMER_REBOOT_WIFI_AP                60*5 // 5min
-#define TIMER_REBOOT_APPLY_SETTINGS         1 // 1s
-
-#define WIFI_AP_SSID                        "PagerDuty_Alerter"
-#define WIFI_AP_PWD                         ""
-
-#define PAGERDUTY_DEFAULT_INTERVAL_S 60
-
 bool startSTAMode();
 bool startAPMode();
 void startHttpServer();
@@ -418,7 +433,7 @@ SimpleTimer         timer_pager_duty_check(checkPagerDuty, NULL, true);
 
 ESP8266WebServer    server(80);
 Config              config("/config.ini");
-Siren               siren(GPIO_SIREN); 
+Siren               siren(GPIO_SIREN, GPIO_SIREN_REVERSED); 
 Button              button(GPIO_BUTTON);
 PagerDuty           pagerduty;
 
