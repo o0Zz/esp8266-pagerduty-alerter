@@ -262,7 +262,7 @@ public:
 
     void mute(unsigned long duration_s) {
         Log("Siren: Mute for " + String(duration_s) + " seconds");
-        digitalWrite(gpio, LOW);
+        digitalWrite(gpio, gpio_reversed ? HIGH : LOW);
         timer_mute.start(duration_s);
     }
 
